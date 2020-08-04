@@ -49,38 +49,38 @@ Shader "MomomaShader/Projector/Wireframe"
 			}
 
 			[maxvertexcount(3)]
-		   	void geom (triangle appdata input[3], inout TriangleStream<g2f> outStream)
-		   	{
+			void geom (triangle appdata input[3], inout TriangleStream<g2f> outStream)
+			{
 				g2f o;
-				
+
 				float3 p0 = UnityObjectToViewPos(input[0].vertex);
-                float3 p1 = UnityObjectToViewPos(input[1].vertex);
-                float3 p2 = UnityObjectToViewPos(input[2].vertex);
+				float3 p1 = UnityObjectToViewPos(input[1].vertex);
+				float3 p2 = UnityObjectToViewPos(input[2].vertex);
 
-                float3 edge[3];
+				float3 edge[3];
 				edge[0] = p2 - p1;
-                edge[1] = p0 - p2;
-                edge[2] = p1 - p0;
+				edge[1] = p0 - p2;
+				edge[2] = p1 - p0;
 
-                float3 len = float3(length(edge[0]), length(edge[1]), length(edge[2]));
+				float3 len = float3(length(edge[0]), length(edge[1]), length(edge[2]));
 				float s = (len.x + len.y + len.z) * 0.5;
 				float r = sqrt((s - len.x) * (s - len.y) * (s - len.z) / s);
 				float area = length(cross(edge[1], edge[2]));
-                
+
 				[unroll]
 				for(uint i = 0; i < 3; i++)
-		      	{
+				{
 					o.pos = UnityObjectToClipPos(input[i].vertex);
 					o.uvShadow = mul(unity_Projector, input[i].vertex);
 					o.uvFalloff = mul(unity_ProjectorClip, input[i].vertex);
 
 					o.weight = 0;
 					o.weight[i] = 1.0 - r / (area / len[i]);
-	
-				   	outStream.Append (o);
+
+					outStream.Append (o);
 				}
 				outStream.RestartStrip();
-		   	}
+			}
 
 			fixed4 frag (g2f i) : SV_Target
 			{
