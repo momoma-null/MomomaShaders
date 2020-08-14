@@ -130,7 +130,7 @@ Shader "MomomaShader/Geometry/Boxel"
 							UNITY_TRANSFER_SHADOW(o,o.uv);
 							UNITY_TRANSFER_FOG(o,o.pos);
 
-							outStream.Append (o);
+							outStream.Append(o);
 						}
 					}
 					outStream.RestartStrip();
@@ -304,7 +304,7 @@ Shader "MomomaShader/Geometry/Boxel"
 							UNITY_TRANSFER_SHADOW(o,o.uv);
 							UNITY_TRANSFER_FOG(o,o.pos);
 
-							outStream.Append (o);
+							outStream.Append(o);
 						}
 					}
 					outStream.RestartStrip();
@@ -416,7 +416,7 @@ Shader "MomomaShader/Geometry/Boxel"
 							
 							TRANSFER_SHADOW_CASTER_NORMALOFFSET(o)
 							
-							outStream.Append (o);
+							outStream.Append(o);
 						}
 					}
 					outStream.RestartStrip();
