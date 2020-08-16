@@ -6,10 +6,10 @@ Shader "MomomaShader/Geometry/Grass"
 {
 	Properties
 	{
-		_Color ("Bottom Color", Color) = (0.1, 1, 0.1, 1)
-		_TopColor ("Top Color", Color) = (0.1, 0.4, 0.1, 1)
-		_Size ("Particle Size", Range(0, 1)) = 0.5
-		_Tess ("Tessellation", Range(0, 8)) = 1.0
+		_Color ("Bottom Color", Color) = (0.1, 0.4, 0.1, 1)
+		_TopColor ("Top Color", Color) = (0.1, 1, 0.1, 1)
+		_Size ("Size", Range(0, 1)) = 0.5
+		_Tess ("Tessellation", Range(0, 10)) = 5.0
 		_TessMin ("Min Distance", Range(0, 100)) = 10.0
 		_TessMax ("Max Distance", Range(0, 100)) = 25.0
 	}
@@ -58,15 +58,26 @@ Shader "MomomaShader/Geometry/Grass"
 		fixed _Size;
 		fixed _Tess, _TessMin, _TessMax;
 
+		inline float2 hash22(float2 p)
+		{
+			return frac(float2(262144, 32768) * sin(dot(p, float2(41, 289)))); 
+		}
+
 		appdata vert(appdata v)
 		{
+			v.uv = hash22(v.uv);
 			return v;
 		}
 
 		UnityTessellationFactors hullconst(InputPatch<appdata, 3> v)
 		{
 			UnityTessellationFactors o;
+			#if defined(USING_STEREO_MATRICES)
+			float4 offset = float4(_WorldSpaceCameraPos - unity_StereoWorldSpaceCameraPos[0], 0);
+			float4 tf = UnityDistanceBasedTess(v[0].pos + offset, v[1].pos + offset, v[2].pos + offset, _TessMin, _TessMax, _Tess);
+			#else
 			float4 tf = UnityDistanceBasedTess(v[0].pos, v[1].pos, v[2].pos, _TessMin, _TessMax, _Tess);
+			#endif
 			o.edge[0] = tf.x;
 			o.edge[1] = tf.y;
 			o.edge[2] = tf.z;
@@ -94,12 +105,6 @@ Shader "MomomaShader/Geometry/Grass"
 			return v;
 		}
 
-		inline float hash21(float2 p)
-		{
-			float h = dot(p, float2(127.1, 311.7));
-			return frac(sin(h) * 43758.5453123);
-		}
-
 		[maxvertexcount(9)]
 		void geom(line appdata input[2], inout TriangleStream<g2f> outStream)
 		{
@@ -107,8 +112,9 @@ Shader "MomomaShader/Geometry/Grass"
 			UNITY_INITIALIZE_OUTPUT(g2f, o);
 			UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
+			float seed[4] = {(input[0].uv.x + input[1].uv.x), (input[0].uv.y + input[1].uv.y) * 0.5, (input[0].uv.x + input[1].uv.y) * 0.5, (input[0].uv.y + input[1].uv.x)};
 			float2 s;
-			sincos(hash21(input[0].uv) * UNITY_PI, s.y, s.x);
+			sincos(seed[0] * UNITY_TWO_PI, s.y, s.x);
 			float4x4 rotationMatrix = 0;
 			rotationMatrix._m00 = s.x;
 			rotationMatrix._m20 = s.y;
@@ -116,11 +122,11 @@ Shader "MomomaShader/Geometry/Grass"
 			rotationMatrix._m02 = -s.y;
 			rotationMatrix._m22 = s.x;
 
-			float seed = hash21(input[1].uv);
-			float scale = 1.0 + seed * seed * seed;
-			float size = _Size * scale;
-			float4 pos = mul(unity_ObjectToWorld, lerp(input[0].pos, input[1].pos, hash21(input[0].uv * 3.7)));
-			seed = hash21(input[1].uv * 4.1);
+			float width = length(mul(unity_ObjectToWorld, input[1].pos - input[0].pos).xyz);
+			float4 pos = mul(unity_ObjectToWorld, lerp(input[0].pos, input[1].pos, seed[2]));
+			float scale = 1.0 + seed[1] * seed[1] * seed[1];
+			float wave = 0.01 * sin(_Time.y / scale + seed[3] * UNITY_TWO_PI);
+			scale *= _Size;
 			float3 worldPos;
 			#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
 			o.worldNormal = float3(-s.y, 0, s.x);
@@ -136,8 +142,8 @@ Shader "MomomaShader/Geometry/Grass"
 				[unroll]
 				for(int x = 0; x < 2; x++)
 				{
-					worldPos = pos + mul(rotationMatrix, float4(float2((x - 0.5) * (0.2 - y * 0.05), y * 0.25) * size, 0, 0));
-					worldPos.x += 0.02 * y * sin(_Time.y / scale + seed * UNITY_TWO_PI) * size;
+					worldPos = pos + mul(rotationMatrix, float4(float2((x - 0.5) * (1.0 - y * 0.25) * width, y * 0.25) * scale, 0, 0));
+					worldPos.x += y * y * wave * scale;
 					#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
 					o.uv = float2(x, y * 0.25);
 					o.worldPos = worldPos;
