@@ -17,127 +17,162 @@ Shader "MomomaShader/Geometry/Boxel"
 	SubShader
 	{
 		Tags { "IgnoreProjector" = "True" "DisableBatching" = "True" }
-		Pass
+
+		CGINCLUDE
+		
+		#pragma target 5.0
+		#pragma vertex vert
+		#pragma geometry geom
+		#pragma fragment frag
+		
+		#include "UnityCG.cginc"
+
+		#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
+		#pragma multi_compile_fog
+
+		#include "Lighting.cginc"
+		#include "AutoLight.cginc"
+		#include "UnityPBSLighting.cginc"
+		
+		sampler2D _MainTex;
+		float4 _MainTex_ST;
+		#endif
+
+		struct appdata
 		{
-			Tags { "LightMode" = "ForwardBase" }
+			float4 vertex : POSITION;
+			float2 uv : TEXCOORD0;
+		};
 
-			CGPROGRAM
-			#pragma target 5.0
-			#pragma vertex vert
-			#pragma geometry geom
-			#pragma fragment frag
-			#pragma multi_compile_fwdbase nolightmap nodirlightmap nodynlightmap
-			#pragma multi_compile_fog
-			
-			#include "UnityCG.cginc"
-			#include "Lighting.cginc"
-			#include "UnityPBSLighting.cginc"
-			#include "AutoLight.cginc"
-
-			sampler2D _MainTex;
-			float4 _MainTex_ST;
-			fixed4 _Color;
-			sampler2D _EmissionMap;
-			fixed4 _EmissionColor;
-			fixed _Glossiness;
-			fixed _Metallic;
-			fixed _CubeSize;
-			static fixed3 face[6] = {float3(1, 0, 0),
-									 float3(0, 0, 0),
-									 float3(0, 1, 0),
-									 float3(0, 0, 1),
-									 float3(0, 0, 1),
-									 float3(0, 1, 0)};
-
-			struct appdata
-			{
-				float4 vertex : POSITION;
-				float2 uv : TEXCOORD0;
-			};
-			
-			struct g2f
-			{
+		struct g2f
+		{
+			#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
 				float4 pos : SV_POSITION;
 				float2 uv : TEXCOORD0;
 				float3 worldNormal : TEXCOORD1;
 				float3 worldPos : TEXCOORD2;
 				UNITY_SHADOW_COORDS(3)
 				UNITY_FOG_COORDS(4)
-				#if UNITY_SHOULD_SAMPLE_SH
-					float3 sh: TEXCOORD5;
+				#if UNITY_SHOULD_SAMPLE_SH && defined(UNITY_PASS_FORWARDBASE)
+				float3 sh: TEXCOORD5;
 				#endif
-				UNITY_VERTEX_OUTPUT_STEREO
-			};
+			#elif defined(UNITY_PASS_SHADOWCASTER)
+				V2F_SHADOW_CASTER;
+			#endif
+			UNITY_VERTEX_OUTPUT_STEREO
+		};
+		
+		fixed _CubeSize;
 
-			appdata vert (appdata v)
+		static fixed3 face[6] = {float3(1, 0, 0),
+								 float3(0, 0, 0),
+								 float3(0, 1, 0),
+								 float3(0, 0, 1),
+								 float3(0, 0, 1),
+								 float3(0, 1, 0)};
+
+		appdata vert(appdata v)
+		{
+			return v;
+		}
+
+		[maxvertexcount(24)]
+		void geom(triangle appdata input[3], inout TriangleStream<g2f> outStream)
+		{
+			g2f o;
+			UNITY_INITIALIZE_OUTPUT(g2f, o);
+			UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
+
+			float3 area = cross((input[1].vertex - input[0].vertex).xyz, (input[2].vertex - input[0].vertex).xyz);
+			float size = _CubeSize * pow(area.x * area.x + area.y * area.y + area.z * area.z, 0.25);
+			float4 pivotPos = (input[0].vertex + input[1].vertex + input[2].vertex) / 3.0;
+			pivotPos.xyz -= size * 0.5;
+
+			#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
+			o.uv = (input[0].uv + input[1].uv + input[2].uv) / 3.0;
+			o.uv = TRANSFORM_TEX(o.uv, _MainTex);
+			#elif defined(UNITY_PASS_SHADOWCASTER)
+			appdata_base v;
+			UNITY_INITIALIZE_OUTPUT(appdata_base, v);
+			#endif
+
+			float3 normal;
+			float4 pos;
+
+			[unroll]
+			for(int z = 0; z < 6; ++z)
 			{
-				appdata o;
-				o.vertex = v.vertex;
-				o.uv = v.uv;
-				
-				return o;
-			}
+				normal = 0;
+				normal[floor(z / 2)] = 1;
+				normal *= (1 - (z % 2) * 2);
+				#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
+				o.worldNormal = UnityObjectToWorldNormal(normal);
+				#elif defined(UNITY_PASS_SHADOWCASTER)
+				v.normal = normal;
+				#endif
 
-			[maxvertexcount(24)]
-			void geom (triangle appdata input[3], inout TriangleStream<g2f> outStream)
-			{
-				g2f o;
-				UNITY_INITIALIZE_OUTPUT(g2f, o);
-				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
-
-				float3 area = cross((input[1].vertex - input[0].vertex).xyz, (input[2].vertex - input[0].vertex).xyz);
-				float size = _CubeSize * pow(area.x * area.x + area.y * area.y + area.z * area.z, .25);
-				float4 pos = (input[0].vertex + input[1].vertex + input[2].vertex) / 3;
-				pos.xyz -= size * .5;
-				
-				o.uv = (input[0].uv + input[1].uv + input[2].uv) / 3;
-				o.uv = TRANSFORM_TEX(o.uv, _MainTex);
-				
 				[unroll]
-				for(int z = 0; z < 6; z++)
+				for(int x = 0; x < 2; ++x)
 				{
-					o.worldNormal = 0;
-					o.worldNormal[floor(z / 2)] = 1;
-					o.worldNormal = UnityObjectToWorldNormal(o.worldNormal * (1 - (z % 2) * 2));
 					[unroll]
-					for(int x = 0; x < 2; x++)
+					for(int y = 0; y < 2; ++y)
 					{
-						[unroll]
-						for(int y = 0; y < 2; y++)
-						{
-							o.pos = float4(dot(face[z], float3(1, x, y)), dot(face[(z + 4) % 6], float3(1, x, y)), dot(face[(z + 2) % 6], float3(1, x, y)), 0) * size + pos;
-							o.worldPos = mul(unity_ObjectToWorld, o.pos).xyz;
-							o.pos = UnityObjectToClipPos(o.pos);
-							
-							#if UNITY_SHOULD_SAMPLE_SH && !UNITY_SAMPLE_FULL_SH_PER_PIXEL
-								o.sh = 0;
-								#ifdef VERTEXLIGHT_ON
-									o.sh += Shade4PointLights(
-									unity_4LightPosX0,
-									unity_4LightPosY0,
-									unity_4LightPosZ0,
-									unity_LightColor[0].rgb,
-									unity_LightColor[1].rgb,
-									unity_LightColor[2].rgb,
-									unity_LightColor[3].rgb,
-									unity_4LightAtten0,
-									o.worldPos,
-									o.worldNormal);
-								#endif
-								o.sh = ShadeSHPerVertex(o.worldNormal, o.sh);
+						pos = pivotPos + float4(dot(face[z], float3(1, x, y)), dot(face[(z + 4) % 6], float3(1, x, y)), dot(face[(z + 2) % 6], float3(1, x, y)), 0) * size;
+						#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
+						o.pos = pos;
+						o.worldPos = mul(unity_ObjectToWorld, o.pos).xyz;
+						o.pos = UnityObjectToClipPos(o.pos);
+						
+						#if UNITY_SHOULD_SAMPLE_SH && !UNITY_SAMPLE_FULL_SH_PER_PIXEL && defined(UNITY_PASS_FORWARDBASE)
+							o.sh = 0;
+							#ifdef VERTEXLIGHT_ON
+								o.sh += Shade4PointLights(
+								unity_4LightPosX0,
+								unity_4LightPosY0,
+								unity_4LightPosZ0,
+								unity_LightColor[0].rgb,
+								unity_LightColor[1].rgb,
+								unity_LightColor[2].rgb,
+								unity_LightColor[3].rgb,
+								unity_4LightAtten0,
+								o.worldPos,
+								o.worldNormal);
 							#endif
+							o.sh = ShadeSHPerVertex(o.worldNormal, o.sh);
+						#endif
 
-							UNITY_TRANSFER_SHADOW(o,o.uv);
-							UNITY_TRANSFER_FOG(o,o.pos);
+						UNITY_TRANSFER_SHADOW(o,o.uv);
+						UNITY_TRANSFER_FOG(o,o.pos);
+						
+						#elif defined(UNITY_PASS_SHADOWCASTER)
+						v.vertex = pos;
+						TRANSFER_SHADOW_CASTER_NORMALOFFSET(o)
+						#endif
 
-							outStream.Append(o);
-						}
+						outStream.Append(o);
 					}
-					outStream.RestartStrip();
 				}
+				outStream.RestartStrip();
 			}
+		}
 
-			fixed4 frag (g2f IN) : SV_Target
+		ENDCG
+
+		Pass
+		{
+			Name "FORWARD"
+			Tags { "LightMode" = "ForwardBase" }
+
+			CGPROGRAM
+			#pragma multi_compile_fwdbase nolightmap nodirlightmap nodynlightmap
+
+			fixed4 _Color;
+			sampler2D _EmissionMap;
+			fixed4 _EmissionColor;
+			fixed _Glossiness;
+			fixed _Metallic;
+			
+			fixed4 frag(g2f IN) : SV_Target
 			{
 				float3 worldPos = IN.worldPos;
 				float3 worldViewDir = normalize(UnityWorldSpaceViewDir(worldPos));
@@ -212,106 +247,21 @@ Shader "MomomaShader/Geometry/Boxel"
 
 		Pass
 		{
+			Name "FORWARD"
 			Tags { "LightMode" = "ForwardAdd" }
 			ZWrite Off
 			Blend One One
 
 			CGPROGRAM
-			#pragma target 5.0
-			#pragma vertex vert
-			#pragma geometry geom
-			#pragma fragment frag
 			#pragma multi_compile_fwdadd_fullshadows
-			#pragma multi_compile_fog
-			
-			#include "UnityCG.cginc"
-			#include "Lighting.cginc"
-			#include "UnityPBSLighting.cginc"
-			#include "AutoLight.cginc"
-			
-			sampler2D _MainTex;
-			float4 _MainTex_ST;
+
 			fixed4 _Color;
 			sampler2D _EmissionMap;
 			fixed4 _EmissionColor;
 			fixed _Glossiness;
 			fixed _Metallic;
-			fixed _CubeSize;
-			static fixed3 face[6] = {float3(1, 0, 0),
-									 float3(0, 0, 0),
-									 float3(0, 1, 0),
-									 float3(0, 0, 1),
-									 float3(0, 0, 1),
-									 float3(0, 1, 0)};
 
-			struct appdata
-			{
-				float4 vertex : POSITION;
-				float2 uv : TEXCOORD0;
-			};
-
-			struct g2f
-			{
-				float4 pos : SV_POSITION;
-				float2 uv : TEXCOORD0;
-				float3 worldNormal : TEXCOORD1;
-				float3 worldPos : TEXCOORD2;
-				UNITY_SHADOW_COORDS(3)
-				UNITY_FOG_COORDS(4)
-				UNITY_VERTEX_OUTPUT_STEREO
-			};
-
-			appdata vert (appdata v)
-			{
-				appdata o;
-				o.vertex = v.vertex;
-				o.uv = v.uv;
-				
-				return o;
-			}
-
-			[maxvertexcount(24)]
-			void geom (triangle appdata input[3], inout TriangleStream<g2f> outStream)
-			{
-				g2f o;
-				UNITY_INITIALIZE_OUTPUT(g2f, o);
-				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
-
-				float3 area = cross((input[1].vertex - input[0].vertex).xyz, (input[2].vertex - input[0].vertex).xyz);
-				float size = _CubeSize * pow(area.x * area.x + area.y * area.y + area.z * area.z, .25);
-				float4 pos = (input[0].vertex + input[1].vertex + input[2].vertex) / 3;
-				pos.xyz -= size * .5;
-				
-				o.uv = (input[0].uv + input[1].uv + input[2].uv) / 3;
-				o.uv = TRANSFORM_TEX(o.uv, _MainTex);
-				
-				[unroll]
-				for(int z = 0; z < 6; z++)
-				{
-					o.worldNormal = 0;
-					o.worldNormal[floor(z / 2)] = 1;
-					o.worldNormal = UnityObjectToWorldNormal(o.worldNormal * (1 - (z % 2) * 2));
-					[unroll]
-					for(int x = 0; x < 2; x++)
-					{
-						[unroll]
-						for(int y = 0; y < 2; y++)
-						{
-							o.pos = float4(dot(face[z], float3(1, x, y)), dot(face[(z + 4) % 6], float3(1, x, y)), dot(face[(z + 2) % 6], float3(1, x, y)), 0) * size + pos;
-							o.worldPos = mul(unity_ObjectToWorld, o.pos).xyz;
-							o.pos = UnityObjectToClipPos(o.pos);
-
-							UNITY_TRANSFER_SHADOW(o,o.uv);
-							UNITY_TRANSFER_FOG(o,o.pos);
-
-							outStream.Append(o);
-						}
-					}
-					outStream.RestartStrip();
-				}
-			}
-
-			fixed4 frag (g2f IN) : SV_Target
+			fixed4 frag(g2f IN) : SV_Target
 			{
 				float3 worldPos = IN.worldPos;
 				float3 worldViewDir = normalize(UnityWorldSpaceViewDir(worldPos));
@@ -355,73 +305,11 @@ Shader "MomomaShader/Geometry/Boxel"
 
 		Pass
 		{
-			Name "ShadowCast"
+			Name "ShadowCaster"
 			Tags { "LightMode" = "ShadowCaster" }
 
 			CGPROGRAM
-			#pragma target 5.0
-			#pragma vertex vert
-			#pragma geometry geom
-			#pragma fragment frag
 			#pragma multi_compile_shadowcaster
-			
-			#include "UnityCG.cginc"
-
-			fixed _CubeSize;
-			static fixed3 face[6] = {float3(1, 0, 0),
-									 float3(0, 0, 0),
-									 float3(0, 1, 0),
-									 float3(0, 0, 1),
-									 float3(0, 0, 1),
-									 float3(0, 1, 0)};
-
-			struct g2f
-			{
-				V2F_SHADOW_CASTER;
-			};
-
-			appdata_base vert(appdata_base v)
-			{
-				appdata_base o;
-				o.vertex = v.vertex;
-				o.texcoord = v.texcoord;
-				o.normal = v.normal;
-				return o;
-			}
-
-			[maxvertexcount(24)]
-			void geom (triangle appdata_base input[3], inout TriangleStream<g2f> outStream)
-			{
-				float3 area = cross((input[1].vertex - input[0].vertex).xyz, (input[2].vertex - input[0].vertex).xyz);
-				float size = _CubeSize * pow(area.x * area.x + area.y * area.y + area.z * area.z, .25);
-				float4 pos = (input[0].vertex + input[1].vertex + input[2].vertex) / 3;
-				pos.xyz -= size * .5;
-
-				g2f o;
-				appdata_base v = (appdata_base)0;
-
-				[unroll]
-				for(int z = 0; z < 6; z++)
-				{
-					v.normal = 0;
-					v.normal[floor(z / 2)] = 1;
-					v.normal *= (1 - (z % 2) * 2);
-					[unroll]
-					for(int x = 0; x < 2; x++)
-					{
-						[unroll]
-						for(int y = 0; y < 2; y++)
-						{
-							v.vertex = float4(dot(face[z], float3(1, x, y)), dot(face[(z + 4) % 6], float3(1, x, y)), dot(face[(z + 2) % 6], float3(1, x, y)), 0) * size + pos;
-							
-							TRANSFER_SHADOW_CASTER_NORMALOFFSET(o)
-							
-							outStream.Append(o);
-						}
-					}
-					outStream.RestartStrip();
-				}
-			}
 
 			float4 frag(g2f i) : SV_Target
 			{
