@@ -10,9 +10,9 @@ Shader "MomomaShader/Geometry/Boxel"
 		_MainTex ("Base (RGB)", 2D) = "white" {}
 		_EmissionColor ("Emission Color", Color) = (0, 0, 0, 0)
 		[NoScaleOffset] _EmissionMap ("Emission Map", 2D) = "white" {}
-		_Glossiness ("Smoothness", Range(0,1)) = .5
-		_Metallic ("Metallic", Range(0,1)) = .0
-		_CubeSize ("Cube Size", Float) = .8
+		_Glossiness ("Smoothness", Range(0,1)) = 0.5
+		_Metallic ("Metallic", Range(0,1)) = 0.0
+		_CubeSize ("Cube Size", Float) = 0.8
 	}
 	SubShader
 	{
@@ -119,10 +119,9 @@ Shader "MomomaShader/Geometry/Boxel"
 					{
 						pos = pivotPos + float4(dot(face[z], float3(1, x, y)), dot(face[(z + 4) % 6], float3(1, x, y)), dot(face[(z + 2) % 6], float3(1, x, y)), 0) * size;
 						#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
-						o.pos = pos;
-						o.worldPos = mul(unity_ObjectToWorld, o.pos).xyz;
-						o.pos = UnityObjectToClipPos(o.pos);
-						
+						o.worldPos = mul(unity_ObjectToWorld, pos).xyz;
+						o.pos = UnityObjectToClipPos(pos);
+
 						#if UNITY_SHOULD_SAMPLE_SH && !UNITY_SAMPLE_FULL_SH_PER_PIXEL && defined(UNITY_PASS_FORWARDBASE)
 							o.sh = 0;
 							#ifdef VERTEXLIGHT_ON
@@ -143,7 +142,7 @@ Shader "MomomaShader/Geometry/Boxel"
 
 						UNITY_TRANSFER_SHADOW(o,o.uv);
 						UNITY_TRANSFER_FOG(o,o.pos);
-						
+
 						#elif defined(UNITY_PASS_SHADOWCASTER)
 						v.vertex = pos;
 						TRANSFER_SHADOW_CASTER_NORMALOFFSET(o)
@@ -307,6 +306,7 @@ Shader "MomomaShader/Geometry/Boxel"
 		{
 			Name "ShadowCaster"
 			Tags { "LightMode" = "ShadowCaster" }
+			Cull Off
 
 			CGPROGRAM
 			#pragma multi_compile_shadowcaster
