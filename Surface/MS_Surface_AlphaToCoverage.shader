@@ -2,7 +2,7 @@
 // Released under the MIT license
 // https://opensource.org/licenses/mit-license.php
 
-Shader "MomomaShader/Surface/Cutout"
+Shader "MomomaShader/Surface/AlphaToCoverage"
 {
 	Properties
 	{
@@ -14,7 +14,7 @@ Shader "MomomaShader/Surface/Cutout"
 		[NoScaleOffset] _MetalicMap ("Metalic Map", 2D) = "white" {}
 		_Glossiness ("Smoothness", Range(0,1)) = 0.5
 		[NoScaleOffset] _GlossMap ("Smoothness Map", 2D) = "white" {}
-		_ClipAlpha ("Clip Alpha", Range(0, 1)) = 0.5
+		_ClipAlpha ("Clip Alpha", Range(0.15, 0.85)) = 0.5
 	}
 	SubShader
 	{
@@ -24,7 +24,7 @@ Shader "MomomaShader/Surface/Cutout"
 		AlphaToMask On
 
 		CGPROGRAM
-		#pragma surface surf Standard fullforwardshadows addshadow alphatest:_ClipAlpha
+		#pragma surface surf Standard fullforwardshadows addshadow alphatest:_
 		#pragma target 3.0
 
 		struct Input
@@ -40,6 +40,7 @@ Shader "MomomaShader/Surface/Cutout"
 		half _Metallic;
 		half _Glossiness;
 		fixed4 _Color;
+		fixed _ClipAlpha;
 
 		UNITY_INSTANCING_BUFFER_START(Props)
 		UNITY_INSTANCING_BUFFER_END(Props)
@@ -51,7 +52,7 @@ Shader "MomomaShader/Surface/Cutout"
 			o.Normal = IN.facing * UnpackNormal(tex2D(_BumpMap, IN.uv_MainTex));
 			o.Metallic = tex2D (_MetalicMap, IN.uv_MainTex) * _Metallic;
 			o.Smoothness = tex2D (_GlossMap, IN.uv_MainTex) * _Glossiness;
-			o.Alpha = c.a;
+			o.Alpha = saturate((c.a - _ClipAlpha) / max(fwidth(c.a), 0.0001) + 0.5);
 		}
 		ENDCG
 	}
