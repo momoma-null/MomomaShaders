@@ -16,20 +16,20 @@ Shader "MomomaShader/Projector/Wireframe"
 			ZWrite Off
 			Blend OneMinusDstColor OneMinusSrcColor
 			Offset -1,-1
-			
+
 			CGPROGRAM
 			#pragma target 5.0
 			#pragma vertex vert
 			#pragma geometry geom
 			#pragma fragment frag
-			
+
 			#include "UnityCG.cginc"
-			
+
 			struct appdata
 			{
 				float4 vertex : POSITION;
 			};
-			
+
 			struct g2f
 			{
 				float4 pos : SV_POSITION;
@@ -37,19 +37,19 @@ Shader "MomomaShader/Projector/Wireframe"
 				float4 uvFalloff : TEXCOORD1;
 				float3 weight : TEXCOORD2;
 			};
-			
+
 			float4x4 unity_Projector;
 			float4x4 unity_ProjectorClip;
-			
+
 			fixed _Width;
-			
-			appdata vert (appdata v)
+
+			appdata vert(appdata v)
 			{
 				return v;
 			}
 
 			[maxvertexcount(3)]
-			void geom (triangle appdata input[3], inout TriangleStream<g2f> outStream)
+			void geom(triangle appdata input[3], inout TriangleStream<g2f> outStream)
 			{
 				g2f o;
 
@@ -77,22 +77,21 @@ Shader "MomomaShader/Projector/Wireframe"
 					o.weight = 0;
 					o.weight[i] = 1.0 - r / (area / len[i]);
 
-					outStream.Append (o);
+					outStream.Append(o);
 				}
 				outStream.RestartStrip();
 			}
 
-			fixed4 frag (g2f i) : SV_Target
+			fixed4 frag(g2f i) : SV_Target
 			{
 				fixed4 uv = UNITY_PROJ_COORD(i.uvShadow);
 				fixed4 uvF = UNITY_PROJ_COORD(i.uvFalloff);
-				
+
 				clip(uvF.x * (1.0 - uvF.x));
 				clip(uv.x * (uv.w - uv.x));
 				clip(uv.y * (uv.w - uv.y));
-				clip(_Width - min(min(i.weight.x, i.weight.y), i.weight.z));
 
-				return 1;
+				return smoothstep(_Width, 0, min(min(i.weight.x, i.weight.y), i.weight.z));
 			}
 			ENDCG
 		}
