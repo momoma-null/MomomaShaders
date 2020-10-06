@@ -6,6 +6,7 @@ Shader "MomomaShader/Projector/Wireframe"
 {
 	Properties
 	{
+		_Color ("Color", Color) = (1, 1, 1, 1)
 		[PowerSlider(2.0)] _Width ("Width", Range(0.001, 0.2)) = 0.01
 	}
 	Subshader
@@ -14,7 +15,7 @@ Shader "MomomaShader/Projector/Wireframe"
 		Pass
 		{
 			ZWrite Off
-			Blend OneMinusDstColor OneMinusSrcColor
+			Blend SrcAlpha OneMinusSrcAlpha
 			Offset -1,-1
 
 			CGPROGRAM
@@ -24,11 +25,6 @@ Shader "MomomaShader/Projector/Wireframe"
 			#pragma fragment frag
 
 			#include "UnityCG.cginc"
-
-			struct appdata
-			{
-				float4 vertex : POSITION;
-			};
 
 			struct g2f
 			{
@@ -41,21 +37,22 @@ Shader "MomomaShader/Projector/Wireframe"
 			float4x4 unity_Projector;
 			float4x4 unity_ProjectorClip;
 
+			fixed4 _Color;
 			fixed _Width;
 
-			appdata vert(appdata v)
+			float4 vert(float4 pos : POSITION) : TEXCOORD0
 			{
-				return v;
+				return pos;
 			}
 
 			[maxvertexcount(3)]
-			void geom(triangle appdata input[3], inout TriangleStream<g2f> outStream)
+			void geom(triangle float4 input[3] : TEXCOORD0, inout TriangleStream<g2f> outStream)
 			{
 				g2f o;
 
-				float3 p0 = UnityObjectToViewPos(input[0].vertex);
-				float3 p1 = UnityObjectToViewPos(input[1].vertex);
-				float3 p2 = UnityObjectToViewPos(input[2].vertex);
+				float3 p0 = UnityObjectToViewPos(input[0]);
+				float3 p1 = UnityObjectToViewPos(input[1]);
+				float3 p2 = UnityObjectToViewPos(input[2]);
 
 				float3 edge[3];
 				edge[0] = p2 - p1;
@@ -70,9 +67,9 @@ Shader "MomomaShader/Projector/Wireframe"
 				[unroll]
 				for(uint i = 0; i < 3; i++)
 				{
-					o.pos = UnityObjectToClipPos(input[i].vertex);
-					o.uvShadow = mul(unity_Projector, input[i].vertex);
-					o.uvFalloff = mul(unity_ProjectorClip, input[i].vertex);
+					o.pos = UnityObjectToClipPos(input[i]);
+					o.uvShadow = mul(unity_Projector, input[i]);
+					o.uvFalloff = mul(unity_ProjectorClip, input[i]);
 
 					o.weight = 0;
 					o.weight[i] = 1.0 - r / (area / len[i]);
@@ -91,7 +88,9 @@ Shader "MomomaShader/Projector/Wireframe"
 				clip(uv.x * (uv.w - uv.x));
 				clip(uv.y * (uv.w - uv.y));
 
-				return smoothstep(_Width, 0, min(min(i.weight.x, i.weight.y), i.weight.z));
+				float4 c = _Color;
+				c.a = smoothstep(_Width, 0, min(min(i.weight.x, i.weight.y), i.weight.z));
+				return c;
 			}
 			ENDCG
 		}
