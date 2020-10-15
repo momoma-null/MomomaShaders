@@ -2,26 +2,40 @@
 // Released under the MIT license
 // https://opensource.org/licenses/mit-license.php
 
-Shader "MomomaShader/Surface/AlphaToCoverage"
+Shader "MomomaShader/Surface/DistanceFade"
 {
 	Properties
 	{
-		[Enum(UnityEngine.Rendering.CullMode)] _Cull("Culling", Float) = 0
 		_Color ("Color", Color) = (1,1,1,1)
 		_MainTex ("Albedo (RGB)", 2D) = "white" {}
-		[Normal][NoScaleOffset] _BumpMap ("Normal Map", 2D) = "bump" {}
-		_Metallic ("Metallic", Range(0,1)) = 0.0
-		[NoScaleOffset] _MetalicMap ("Metalic Map", 2D) = "white" {}
 		_Glossiness ("Smoothness", Range(0,1)) = 0.5
-		[NoScaleOffset] _GlossMap ("Smoothness Map", 2D) = "white" {}
-		_ClipAlpha ("Clip Alpha", Range(0.15, 0.85)) = 0.5
+		_Metallic ("Metallic", Range(0,1)) = 0.0
+		[Normal][NoScaleOffset] _BumpMap ("NormalMap", 2D) = "bump" {}
+		[NoScaleOffset] _EmissionMap ("Emission", 2D) = "black" {}
+		_Distance ("Disappearance distance" , Range(0,30)) = 5.0
+		_DitherAmount ("Dither Amount", Range(0, 1)) = 0.5
+		[Enum(Off, 0, On, 1)] _FadeReverse ("Fade Reverse", Float) = 0
 	}
 	SubShader
 	{
 		Tags { "RenderType" = "TransparentCutout" "Queue" = "AlphaTest" }
 
-		Cull [_Cull]
 		AlphaToMask On
+
+		CGINCLUDE
+
+		fixed _Distance;
+		fixed _DitherAmount;
+		fixed _FadeReverse;
+
+		inline fixed dither(float3 worldPos, float2 seed)
+		{
+			float d0 = distance(worldPos, _WorldSpaceCameraPos);
+			float d1 = _Distance * lerp(1, frac(sin(dot(seed, float2(12.9898, 78.233))) * 43758.5453), _DitherAmount);
+			return saturate((d0 - d1) * (_FadeReverse * 2 - 1));
+		}
+
+		ENDCG
 
 		CGPROGRAM
 		#pragma surface surf Standard fullforwardshadows alphatest:_
@@ -30,29 +44,28 @@ Shader "MomomaShader/Surface/AlphaToCoverage"
 		struct Input
 		{
 			float2 uv_MainTex;
-			float facing : VFACE;
+			float3 worldPos;
 		};
 
 		sampler2D _MainTex;
 		sampler2D _BumpMap;
-		sampler2D _MetalicMap;
-		sampler2D _GlossMap;
-		half _Metallic;
+		sampler2D _EmissionMap;
 		half _Glossiness;
+		half _Metallic;
 		fixed4 _Color;
-		fixed _ClipAlpha;
 
 		UNITY_INSTANCING_BUFFER_START(Props)
 		UNITY_INSTANCING_BUFFER_END(Props)
 
-		void surf (Input IN, inout SurfaceOutputStandard o)
+		void surf(Input IN, inout SurfaceOutputStandard o)
 		{
 			fixed4 c = tex2D (_MainTex, IN.uv_MainTex) * _Color;
 			o.Albedo = c.rgb;
-			o.Normal = IN.facing * UnpackNormal(tex2D(_BumpMap, IN.uv_MainTex));
-			o.Metallic = tex2D (_MetalicMap, IN.uv_MainTex) * _Metallic;
-			o.Smoothness = tex2D (_GlossMap, IN.uv_MainTex) * _Glossiness;
-			o.Alpha = saturate((c.a - _ClipAlpha) / max(fwidth(c.a), 0.0001) + 0.5);
+			o.Alpha = c.a * dither(IN.worldPos, IN.uv_MainTex);
+			o.Metallic = _Metallic;
+			o.Smoothness = _Glossiness;
+			o.Normal = UnpackNormal(tex2D(_BumpMap, IN.uv_MainTex));
+			o.Emission = tex2D(_EmissionMap, IN.uv_MainTex);
 		}
 		ENDCG
 
@@ -73,6 +86,7 @@ Shader "MomomaShader/Surface/AlphaToCoverage"
 			{
 				V2F_SHADOW_CASTER;
 				float2  uv : TEXCOORD1;
+				float3 worldPos : TEXCOORD2;
 				UNITY_VERTEX_OUTPUT_STEREO
 			};
 
@@ -85,12 +99,12 @@ Shader "MomomaShader/Surface/AlphaToCoverage"
 				UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 				TRANSFER_SHADOW_CASTER_NORMALOFFSET(o)
 				o.uv = TRANSFORM_TEX(v.texcoord, _MainTex);
+				o.worldPos = mul(unity_ObjectToWorld, v.vertex);
 				return o;
 			}
 
 			sampler2D _MainTex;
 			fixed4 _Color;
-			fixed _ClipAlpha;
 
 			inline float3 shadow()
 			{
@@ -100,11 +114,11 @@ Shader "MomomaShader/Surface/AlphaToCoverage"
 			float4 frag( v2f i ) : SV_Target
 			{
 				fixed a = tex2D (_MainTex, i.uv).a * _Color.a;
-				a = saturate((a - _ClipAlpha) / max(fwidth(a), 0.0001) + 0.5);
+				a *= dither(i.worldPos, i.uv);
 				return float4(shadow(), a);
 			}
 			ENDCG
 		}
 	}
-	FallBack "Standard"
+	Fallback "Standard"
 }
