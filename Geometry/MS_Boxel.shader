@@ -19,12 +19,12 @@ Shader "MomomaShader/Geometry/Boxel"
 		Tags { "IgnoreProjector" = "True" "DisableBatching" = "True" }
 
 		CGINCLUDE
-		
+
 		#pragma target 5.0
 		#pragma vertex vert
 		#pragma geometry geom
 		#pragma fragment frag
-		
+
 		#include "UnityCG.cginc"
 
 		#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
@@ -33,7 +33,7 @@ Shader "MomomaShader/Geometry/Boxel"
 		#include "Lighting.cginc"
 		#include "AutoLight.cginc"
 		#include "UnityPBSLighting.cginc"
-		
+
 		sampler2D _MainTex;
 		float4 _MainTex_ST;
 		#endif
@@ -61,7 +61,7 @@ Shader "MomomaShader/Geometry/Boxel"
 			#endif
 			UNITY_VERTEX_OUTPUT_STEREO
 		};
-		
+
 		fixed _CubeSize;
 
 		static fixed3 face[6] = {float3(1, 0, 0),
@@ -170,7 +170,7 @@ Shader "MomomaShader/Geometry/Boxel"
 			fixed4 _EmissionColor;
 			fixed _Glossiness;
 			fixed _Metallic;
-			
+
 			fixed4 frag(g2f IN) : SV_Target
 			{
 				float3 worldPos = IN.worldPos;
@@ -181,7 +181,7 @@ Shader "MomomaShader/Geometry/Boxel"
 				#else
 					fixed3 lightDir = _WorldSpaceLightPos0.xyz;
 				#endif
-				
+
 				SurfaceOutputStandard o;
 				UNITY_INITIALIZE_OUTPUT(SurfaceOutputStandard, o);
 				o.Albedo = tex2D(_MainTex, IN.uv) * _Color;

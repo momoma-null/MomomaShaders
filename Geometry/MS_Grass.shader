@@ -127,7 +127,7 @@ Shader "MomomaShader/Geometry/Grass"
 			float scale = 1.0 + seed[1] * seed[1] * seed[1];
 			float wave = 0.01 * sin(_Time.y / scale + seed[3] * UNITY_TWO_PI);
 			scale *= _Size;
-			float3 worldPos;
+			float4 worldPos;
 			#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
 			o.worldNormal = float3(-s.y, 0, s.x);
 			#elif defined(UNITY_PASS_SHADOWCASTER)
