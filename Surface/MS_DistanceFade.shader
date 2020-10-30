@@ -18,7 +18,7 @@ Shader "MomomaShader/Surface/DistanceFade"
 		Tags { "RenderType" = "Transparent" "Queue" = "Transparent" }
 
 		CGPROGRAM
-		#pragma surface surf Standard fullforwardshadows alpha:fade
+		#pragma surface surf Standard addshadow fullforwardshadows alpha:fade
 		#pragma target 3.0
 
 		sampler2D _MainTex;
@@ -47,5 +47,5 @@ Shader "MomomaShader/Surface/DistanceFade"
 		}
 		ENDCG
 	}
-	FallBack "Standard/Transparent"
+	FallBack "Standard"
 }
