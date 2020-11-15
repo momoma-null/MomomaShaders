@@ -12,6 +12,7 @@ Shader "MomomaShader/Surface/FlexibleFrame"
 		_Glossiness ("Smoothness", Range(0,1)) = 0.5
 		_Metallic ("Metallic", Range(0,1)) = 0.0
 		_Width ("Width", Float) = 1.0
+		[Enum(Off, 0, On, 1)] _AutoUVScale ("Auto UV Scale", Float) = 1.0
 	}
 	SubShader
 	{
@@ -23,6 +24,7 @@ Shader "MomomaShader/Surface/FlexibleFrame"
 		{
 			float2 uv_MainTex;
 			float2 uv_NormalMap;
+			float4 color : COLOR;
 		};
 
 		sampler2D _MainTex;
@@ -31,12 +33,14 @@ Shader "MomomaShader/Surface/FlexibleFrame"
 		half _Glossiness;
 		half _Metallic;
 		fixed _Width;
+		fixed _AutoUVScale;
 		
 		void vert(inout appdata_full i)
 		{
 			float3 scale = float3(length(unity_WorldToObject[0].xyz), length(unity_WorldToObject[1].xyz), length(unity_WorldToObject[2].xyz));
 			i.vertex.xy += (1.0 - _Width * scale.xy) * (0.5 * sign(i.vertex.xy) - i.vertex.xy);
-			i.texcoord.xy = i.vertex.xy / scale.xy + i.vertex.z * i.normal.xy / scale.z;
+			if (_AutoUVScale)
+				i.texcoord.xy = i.vertex.xy / scale.xy + i.vertex.z * i.normal.xy / scale.z;
 		}
 
 		UNITY_INSTANCING_BUFFER_START(Props)
@@ -44,7 +48,7 @@ Shader "MomomaShader/Surface/FlexibleFrame"
 
 		void surf (Input IN, inout SurfaceOutputStandard o)
 		{
-			o.Albedo = _Color.rgb * tex2D(_MainTex, IN.uv_MainTex);
+			o.Albedo = IN.color * _Color.rgb * tex2D(_MainTex, IN.uv_MainTex);
 			o.Normal = UnpackNormal(tex2D(_NormalMap, IN.uv_NormalMap));
 			o.Metallic = _Metallic;
 			o.Smoothness = _Glossiness;
