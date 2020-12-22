@@ -17,6 +17,7 @@ Shader "MomomaShader/Surface/Triplanar"
 		_Metallic ("Metallic", Range(0,1)) = 0.0
 		_Glossiness ("Smoothness", Range(0,1)) = 0.5
 		[NoScaleOffset] _NoiseTex ("Noise Texture", 2D) = "black" {}
+		_NoiseScale ("Noise Scale", Range(0.001, 0.05)) = 0.02
 	}
 	SubShader
 	{
@@ -40,6 +41,7 @@ Shader "MomomaShader/Surface/Triplanar"
 		half _Glossiness;
 		fixed4 _Color;
 		sampler2D _NoiseTex;
+		fixed _NoiseScale;
 
 		void vert(inout appdata_full i, out Input o)
 		{
@@ -58,17 +60,14 @@ Shader "MomomaShader/Surface/Triplanar"
 
 		float4 tex2Dtile(sampler2D samp, float2 uv)
 		{
-			float k = tex2D(_NoiseTex, 0.01 * uv).x;
-
-			float index = k * 8.0;
-			float i = floor(index);
-			float f = index - i;
+			float k = tex2D(_NoiseTex, _NoiseScale * uv).x * 8.0;
+			float i = floor(k);
+			float f = k - i;
 			float2 offa = sin(float2(3.0, 7.0) * (i + 0.0));
 			float2 offb = sin(float2(3.0, 7.0) * (i + 1.0));
 			float2 dx = ddx(uv), dy = ddy(uv);
 			float4 cola = tex2Dgrad(samp, uv + offa, dx, dy);
 			float4 colb = tex2Dgrad(samp, uv + offb, dx, dy);
-
 			return lerp(cola, colb, smoothstep(0.2, 0.8, f - 0.1 * sum(cola-colb)));
 		}
 
