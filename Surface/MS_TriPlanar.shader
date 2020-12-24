@@ -18,6 +18,7 @@ Shader "MomomaShader/Surface/Triplanar"
 		_Glossiness ("Smoothness", Range(0,1)) = 0.5
 		[NoScaleOffset] _NoiseTex ("Noise Texture", 2D) = "black" {}
 		_NoiseScale ("Noise Scale", Range(0.001, 0.05)) = 0.02
+		_NoiseHeight ("Noise Height", Range(5.0, 20.0)) = 12.0
 	}
 	SubShader
 	{
@@ -41,7 +42,7 @@ Shader "MomomaShader/Surface/Triplanar"
 		half _Glossiness;
 		fixed4 _Color;
 		sampler2D _NoiseTex;
-		fixed _NoiseScale;
+		fixed _NoiseScale, _NoiseHeight;
 
 		void vert(inout appdata_full i, out Input o)
 		{
@@ -60,7 +61,7 @@ Shader "MomomaShader/Surface/Triplanar"
 
 		float4 tex2Dtile(sampler2D samp, float2 uv)
 		{
-			float k = tex2D(_NoiseTex, _NoiseScale * uv).x * 8.0;
+			float k = tex2D(_NoiseTex, _NoiseScale * uv).x * _NoiseHeight;
 			float i = floor(k);
 			float f = k - i;
 			float2 offa = sin(float2(3.0, 7.0) * (i + 0.0));
