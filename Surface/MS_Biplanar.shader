@@ -16,7 +16,7 @@ Shader "MomomaShader/Surface/Biplanar"
 		_Color ("Color", Color) = (1,1,1,1)
 		_MainTex ("Albedo (RGB)", 2D) = "white" {}
 		[Normal][NoScaleOffset] _BumpMap ("Normal Map", 2D) = "bump" {}
-		[NoScaleOffset] _MetallicGlossMap ("Metallic Gloss Map", 2D) = "black" {}
+		[NoScaleOffset] _MetallicGlossMap ("Metallic Gloss Map", 2D) = "white" {}
 		_Metallic ("Metallic", Range(0,1)) = 0.0
 		_Glossiness ("Smoothness", Range(0,1)) = 0.5
 		[NoScaleOffset] _NoiseTex ("Noise Texture", 2D) = "black" {}
