@@ -57,15 +57,7 @@ Shader "MomomaShader/Surface/TransparentMirror"
 
 		inline half4 LightingMirror(SurfaceOutputStandard s, float3 viewDir, UnityGI gi)
 		{
-			s.Normal = normalize(s.Normal);
-			half oneMinusReflectivity;
-			half3 specColor;
-			s.Albedo = DiffuseAndSpecularFromMetallic(s.Albedo, s.Metallic, /*out*/ specColor, /*out*/ oneMinusReflectivity);
-			half outputAlpha;
-			s.Albedo = PreMultiplyAlpha(s.Albedo, s.Alpha, oneMinusReflectivity, /*out*/ outputAlpha);
-			half4 c = UNITY_BRDF_PBS(s.Albedo, specColor, oneMinusReflectivity, s.Smoothness, s.Normal, viewDir, gi.light, gi.indirect);
-			c.a = outputAlpha;
-			return c;
+			return LightingStandard(s, viewDir, gi);
 		}
 
 		inline void LightingMirror_GI(SurfaceOutputStandard s, UnityGIInput data, inout UnityGI gi)
