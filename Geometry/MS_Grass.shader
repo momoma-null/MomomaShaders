@@ -11,7 +11,8 @@ Shader "MomomaShader/Geometry/Grass"
 		_Size ("Size", Range(0, 1)) = 0.5
 		_Tess ("Tessellation", Range(0, 10)) = 5.0
 		_TessMin ("Min Distance", Range(0, 100)) = 10.0
-		_TessMax ("Max Distance", Range(0, 100)) = 25.0
+		_TessMax ("Max Distance", Range(0, 200)) = 25.0
+		_HeightOffset ("Height Offset", Float) = 0.0
 	}
 
 	SubShader
@@ -25,58 +26,66 @@ Shader "MomomaShader/Geometry/Grass"
 		#include "Tessellation.cginc"
 		#include "Lighting.cginc"
 		#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
-		#include "AutoLight.cginc"
+			#include "AutoLight.cginc"
 		#endif
-			
+		
 		struct appdata
 		{
 			float4 pos : POSITION;
 			float2 uv : TEXCOORD0;
+			float2 uv1 : TEXCOORD1;
 		};
 
 		#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
-		struct g2f
-		{
-			UNITY_POSITION(pos);
-			float2 uv : TEXCOORD0;
-			float3 worldNormal : TEXCOORD1;
-			float3 worldPos : TEXCOORD2;
-			UNITY_SHADOW_COORDS(3)
-			UNITY_FOG_COORDS(4)
-			UNITY_VERTEX_OUTPUT_STEREO
-		};
+			struct g2f
+			{
+				UNITY_POSITION(pos);
+				#ifdef LIGHTMAP_ON
+					float4 uv : TEXCOORD0;
+				#else
+					float2 uv : TEXCOORD0;
+				#endif
+				float3 worldNormal : TEXCOORD1;
+				float3 worldPos : TEXCOORD2;
+				UNITY_SHADOW_COORDS(3)
+				UNITY_FOG_COORDS(4)
+				UNITY_VERTEX_OUTPUT_STEREO
+			};
 
-		fixed4 _Color, _TopColor;
+			fixed4 _Color, _TopColor;
 		#elif defined(UNITY_PASS_SHADOWCASTER)
-		struct g2f
-		{
-			V2F_SHADOW_CASTER;
-			UNITY_VERTEX_OUTPUT_STEREO
-		};	
+			struct g2f
+			{
+				V2F_SHADOW_CASTER;
+				UNITY_VERTEX_OUTPUT_STEREO
+			};
 		#endif
 
 		fixed _Size;
 		fixed _Tess, _TessMin, _TessMax;
+		fixed _HeightOffset;
 
 		inline float2 hash22(float2 p)
 		{
-			return frac(float2(262144, 32768) * sin(dot(p, float2(41, 289)))); 
+			return frac(float2(262144, 32768) * sin(dot(p, float2(41, 289))));
 		}
 
 		appdata vert(appdata v)
 		{
-			v.uv = hash22(v.uv);
+			#ifdef LIGHTMAP_ON
+				v.uv1.xy = v.uv1.xy * unity_LightmapST.xy + unity_LightmapST.zw;
+			#endif
 			return v;
 		}
 
-		UnityTessellationFactors hullconst(InputPatch<appdata, 3> v)
+		UnityTessellationFactors hullconst(InputPatch < appdata, 3 > v)
 		{
 			UnityTessellationFactors o;
 			#if defined(USING_STEREO_MATRICES)
-			float4 offset = float4(_WorldSpaceCameraPos - unity_StereoWorldSpaceCameraPos[0], 0);
-			float4 tf = UnityDistanceBasedTess(v[0].pos + offset, v[1].pos + offset, v[2].pos + offset, _TessMin, _TessMax, _Tess);
+				float4 offset = float4(_WorldSpaceCameraPos - unity_StereoWorldSpaceCameraPos[0], 0);
+				float4 tf = UnityDistanceBasedTess(v[0].pos + offset, v[1].pos + offset, v[2].pos + offset, _TessMin, _TessMax, _Tess);
 			#else
-			float4 tf = UnityDistanceBasedTess(v[0].pos, v[1].pos, v[2].pos, _TessMin, _TessMax, _Tess);
+				float4 tf = UnityDistanceBasedTess(v[0].pos, v[1].pos, v[2].pos, _TessMin, _TessMax, _Tess);
 			#endif
 			o.edge[0] = tf.x;
 			o.edge[1] = tf.y;
@@ -90,18 +99,19 @@ Shader "MomomaShader/Geometry/Grass"
 		[UNITY_outputtopology("triangle_cw")]
 		[UNITY_patchconstantfunc("hullconst")]
 		[UNITY_outputcontrolpoints(3)]
-		appdata hull(InputPatch<appdata, 3> v, uint id : SV_OutputControlPointID)
+		appdata hull(InputPatch < appdata, 3 > v, uint id : SV_OutputControlPointID)
 		{
 			return v[id];
 		}
 
 		[UNITY_domain("tri")]
-		appdata doma(UnityTessellationFactors tessFactors, const OutputPatch<appdata, 3> vi, float3 bary : SV_DomainLocation)
+		appdata doma(UnityTessellationFactors tessFactors, const OutputPatch < appdata, 3 > vi, float3 bary : SV_DomainLocation)
 		{
 			appdata v;
 			UNITY_INITIALIZE_OUTPUT(appdata, v);
 			v.pos = vi[0].pos * bary.x + vi[1].pos * bary.y + vi[2].pos * bary.z;
-			v.uv = vi[0].uv * bary.x + vi[1].uv * bary.y + vi[2].uv * bary.z;
+			v.uv = hash22(vi[0].uv * bary.x + vi[1].uv * bary.y + vi[2].uv * bary.z);
+			v.uv1 = vi[0].uv1 * bary.x + vi[1].uv1 * bary.y + vi[2].uv1 * bary.z;
 			return v;
 		}
 
@@ -112,7 +122,9 @@ Shader "MomomaShader/Geometry/Grass"
 			UNITY_INITIALIZE_OUTPUT(g2f, o);
 			UNITY_INITIALIZE_VERTEX_OUTPUT_STEREO(o);
 
-			float seed[4] = {(input[0].uv.x + input[1].uv.x), (input[0].uv.y + input[1].uv.y) * 0.5, (input[0].uv.x + input[1].uv.y) * 0.5, (input[0].uv.y + input[1].uv.x)};
+			float seed[4] = {
+				(input[0].uv.x + input[1].uv.x), (input[0].uv.y + input[1].uv.y) * 0.5, (input[0].uv.x + input[1].uv.y) * 0.5, (input[0].uv.y + input[1].uv.x)
+			};
 			float2 s;
 			sincos(seed[0] * UNITY_TWO_PI, s.y, s.x);
 			float4x4 rotationMatrix = 0;
@@ -124,35 +136,40 @@ Shader "MomomaShader/Geometry/Grass"
 
 			float width = length(mul(unity_ObjectToWorld, input[1].pos - input[0].pos).xyz);
 			float4 pos = mul(unity_ObjectToWorld, lerp(input[0].pos, input[1].pos, seed[2]));
+			pos.y += _HeightOffset;
 			float scale = 1.0 + seed[1] * seed[1] * seed[1];
 			float wave = 0.01 * sin(_Time.y / scale + seed[3] * UNITY_TWO_PI);
 			scale *= _Size;
 			float4 worldPos;
 			#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
-			o.worldNormal = float3(-s.y, 0, s.x);
+				o.worldNormal = float3(-s.y, 0, s.x);
+				float2 uv1 = lerp(input[0].uv1, input[1].uv1, seed[2]);
+				#ifdef LIGHTMAP_ON
+					o.uv.zw = uv1;
+				#endif
 			#elif defined(UNITY_PASS_SHADOWCASTER)
-			appdata_base v;
-			UNITY_INITIALIZE_OUTPUT(appdata_base, v);
-			v.normal = normalize(mul((float3x3)unity_WorldToObject, float3(-s.y, 0, s.x)));
+				appdata_base v;
+				UNITY_INITIALIZE_OUTPUT(appdata_base, v);
+				v.normal = normalize(mul((float3x3)unity_WorldToObject, float3(-s.y, 0, s.x)));
 			#endif
 
 			[unroll]
-			for(int y = 0; y < 5; y++)
+			for (int y = 0; y < 5; y++)
 			{
 				[unroll]
-				for(int x = 0; x < 2; x++)
+				for (int x = 0; x < 2; x++)
 				{
 					worldPos = pos + mul(rotationMatrix, float4(float2((x - 0.5) * (1.0 - y * 0.25) * width, y * 0.25) * scale, 0, 0));
 					worldPos.x += y * y * wave * scale;
 					#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
-					o.uv = float2(x, y * 0.25);
-					o.worldPos = worldPos;
-					o.pos = UnityWorldToClipPos(o.worldPos);
-					UNITY_TRANSFER_SHADOW(o, o.uv);
-					UNITY_TRANSFER_FOG(o, o.pos);
+						o.uv.xy = float2(x, y * 0.25);
+						o.worldPos = worldPos;
+						o.pos = UnityWorldToClipPos(o.worldPos);
+						UNITY_TRANSFER_SHADOW(o, uv1);
+						UNITY_TRANSFER_FOG(o, o.pos);
 					#elif defined(UNITY_PASS_SHADOWCASTER)
-					v.vertex = mul(unity_WorldToObject, worldPos);
-					TRANSFER_SHADOW_CASTER_NORMALOFFSET(o)
+						v.vertex = mul(unity_WorldToObject, worldPos);
+						TRANSFER_SHADOW_CASTER_NORMALOFFSET(o)
 					#endif
 					outStream.Append(o);
 				}
@@ -174,15 +191,20 @@ Shader "MomomaShader/Geometry/Grass"
 			#pragma domain doma
 			#pragma geometry geom
 			#pragma fragment frag
-			#pragma multi_compile_fwdbase nolightmap nodirlightmap nodynlightmap
+			#pragma multi_compile_fwdbase nodirlightmap nodynlightmap
 			#pragma multi_compile_fog
 
 			fixed4 frag(g2f IN, fixed facing : VFACE) : SV_Target
 			{
 				UNITY_LIGHT_ATTENUATION(atten, IN, IN.worldPos)
-				fixed4 c = lerp(_Color, _TopColor, IN.uv.y);
-				c.rgb *= _LightColor0.rgb * atten;
+				half4 baseColor = lerp(_Color, _TopColor, IN.uv.y);
+				half4 c = baseColor * atten;
+				c.rgb *= _LightColor0.rgb;
 				c.rgb *= 0.5 + 0.5 * saturate(dot(IN.worldNormal * facing, _WorldSpaceLightPos0.xyz));
+				#ifdef LIGHTMAP_ON
+					half4 bakedColorTex = UNITY_SAMPLE_TEX2D(unity_Lightmap, IN.uv.zw);
+					c.rgb += baseColor.rgb * DecodeLightmap(bakedColorTex);
+				#endif
 				UNITY_APPLY_FOG(IN.fogCoord, c);
 				UNITY_OPAQUE_ALPHA(c.a);
 				return c;
