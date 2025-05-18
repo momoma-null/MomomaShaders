@@ -191,7 +191,7 @@ Shader "MomomaShader/Geometry/Grass"
 			#pragma domain doma
 			#pragma geometry geom
 			#pragma fragment frag
-			#pragma multi_compile_fwdbase nodirlightmap nodynlightmap
+			#pragma multi_compile_fwdbase
 			#pragma multi_compile_fog
 
 			fixed4 frag(g2f IN, fixed facing : VFACE) : SV_Target
