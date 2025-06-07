@@ -1,14 +1,14 @@
 {
-    "name": "com.momoma.momoma-shaders",
-    "displayName": "Momoma Shaders",
-    "version": "1.0.0",
-    "unity": "2018.4",
-    "description": "A set of useful shaders.",
-    "author": {
-      "name": "momoma"
-    },
-    "repository": {
-      "url": "https://github.com/momoma-null/MomomaShaders.git",
-      "type": "git"
-    }
+  "name": "com.momoma.momoma-shaders",
+  "displayName": "Momoma Shaders",
+  "version": "1.0.0",
+  "unity": "2022.3",
+  "description": "A set of useful shaders.",
+  "author": {
+    "name": "momoma"
+  },
+  "repository": {
+    "url": "https://github.com/momoma-null/MomomaShaders.git",
+    "type": "git"
+  }
 }
