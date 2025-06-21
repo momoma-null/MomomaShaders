@@ -9,10 +9,9 @@ Shader "MomomaShader/Geometry/Grass"
 		_Color ("Bottom Color", Color) = (0.1, 0.4, 0.1, 1)
 		_TopColor ("Top Color", Color) = (0.1, 1, 0.1, 1)
 		_Size ("Size", Range(0, 1)) = 0.5
-		_Tess ("Tessellation", Range(0, 10)) = 5.0
-		_TessMin ("Min Distance", Range(0, 100)) = 10.0
-		_TessMax ("Max Distance", Range(0, 200)) = 25.0
+		_Tess ("Tessellation", Range(1, 32)) = 5.0
 		_HeightOffset ("Height Offset", Float) = 0.0
+		_WindSpeed ("Wind Speed", Float) = 0.5
 	}
 
 	SubShader
@@ -62,12 +61,28 @@ Shader "MomomaShader/Geometry/Grass"
 		#endif
 
 		fixed _Size;
-		fixed _Tess, _TessMin, _TessMax;
+		half _Tess;
 		fixed _HeightOffset;
+		half _WindSpeed;
 
 		inline float2 hash22(float2 p)
 		{
 			return frac(float2(262144, 32768) * sin(dot(p, float2(41, 289))));
+		}
+
+		inline float CubicSmooth(float x)
+		{
+			return x * x * (3.0 - 2.0 * x);
+		}
+
+		inline float TriangleWave(float x)
+		{
+			return abs((frac(x + 0.5) * 2.0) - 1.0);
+		}
+
+		inline float TrigApproximate(float x)
+		{
+			return CubicSmooth(TriangleWave(x)) * 2.0 - 1.0;
 		}
 
 		appdata vert(appdata v)
@@ -81,16 +96,10 @@ Shader "MomomaShader/Geometry/Grass"
 		UnityTessellationFactors hullconst(InputPatch < appdata, 3 > v)
 		{
 			UnityTessellationFactors o;
-			#if defined(USING_STEREO_MATRICES)
-				float4 offset = float4(_WorldSpaceCameraPos - unity_StereoWorldSpaceCameraPos[0], 0);
-				float4 tf = UnityDistanceBasedTess(v[0].pos + offset, v[1].pos + offset, v[2].pos + offset, _TessMin, _TessMax, _Tess);
-			#else
-				float4 tf = UnityDistanceBasedTess(v[0].pos, v[1].pos, v[2].pos, _TessMin, _TessMax, _Tess);
-			#endif
-			o.edge[0] = tf.x;
-			o.edge[1] = tf.y;
-			o.edge[2] = tf.z;
-			o.inside = tf.w;
+			o.edge[0] = _Tess;
+			o.edge[1] = _Tess;
+			o.edge[2] = _Tess;
+			o.inside = _Tess;
 			return o;
 		}
 
@@ -138,7 +147,7 @@ Shader "MomomaShader/Geometry/Grass"
 			float4 pos = mul(unity_ObjectToWorld, lerp(input[0].pos, input[1].pos, seed[2]));
 			pos.y += _HeightOffset;
 			float scale = 1.0 + seed[1] * seed[1] * seed[1];
-			float wave = 0.01 * sin(_Time.y / scale + seed[3] * UNITY_TWO_PI);
+			float wave = 0.01 * TrigApproximate(_Time.y / scale * _WindSpeed + seed[3]);
 			scale *= _Size;
 			float4 worldPos;
 			#if defined(UNITY_PASS_FORWARDBASE) || defined(UNITY_PASS_FORWARDADD)
